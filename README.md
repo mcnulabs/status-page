@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/header.png" alt="MCNU Labs" width="100%">
+
 # ∇ MCNU Status
 
 **Follow the gradient — even when it points down.**
@@ -8,9 +10,38 @@ A self-hosted status & monitoring suite for the MCNU Labs infrastructure.
 One service, two faces: a **public status page** the world can trust, and a
 **private operator dashboard** that never leaks a thing.
 
-`AI · ML · Quantum` — and the machines that keep them running.
+<br>
+
+<img src="docs/mcnu-shield-labs.svg" alt="MCNU Labs" height="20">
+<img src="docs/mcnu-shield-research.svg" alt="AI · ML · Quantum" height="20">
+<img src="docs/mcnu-shield-powered.svg" alt="powered by MCNU" height="20">
+
+<br><br>
+
+![Node](https://img.shields.io/badge/Node-%E2%89%A520-22D3EE?style=flat-square&labelColor=0A0E1A&logo=node.js&logoColor=22D3EE)
+![Fastify](https://img.shields.io/badge/Fastify-5-A78BFA?style=flat-square&labelColor=0A0E1A&logo=fastify&logoColor=A78BFA)
+![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-22D3EE?style=flat-square&labelColor=0A0E1A&logo=sqlite&logoColor=22D3EE)
+![License](https://img.shields.io/badge/license-private-A78BFA?style=flat-square&labelColor=0A0E1A)
+![Status](https://img.shields.io/badge/status-live-22D3EE?style=flat-square&labelColor=0A0E1A)
 
 </div>
+
+---
+
+## Contents
+
+- [The 3 things that matter](#the-3-things-that-matter)
+- [What's where, and what it does](#whats-where-and-what-it-does)
+- [Probe types](#how-the-gradient-is-measured--probe-types)
+- [Components — the config grammar](#components--the-config-grammar)
+- [Incidents](#incidents)
+- [Alerting](#alerting)
+- [Configuration reference](#configuration-reference)
+- [Security model](#security-model)
+- [Architecture & file map](#architecture--file-map)
+- [Install (VPS)](#install-vps)
+- [Local dev](#local-dev)
+- [Operating notes](#operating-notes)
 
 ---
 
@@ -44,6 +75,10 @@ The face the world sees. No login. Shows:
 
 It exposes **only** abstract labels + up/down + uptime + incidents. The probe target
 (`https://…/api/health`, `smtp.purelymail.com:465`, …) never leaves the server.
+
+> **Screenshots** — drop captures into `docs/` and reference them here:
+> `docs/public.png` (status page) · `docs/admin.png` (dashboard) · `docs/incident.png`.
+> Live: **[status.mcnu.ro](https://status.mcnu.ro/)**.
 
 ### ⚙ Operator dashboard — `status.mcnu.ro/admin`
 Behind a password. The raw truth of the box:
@@ -127,6 +162,89 @@ on every probe.
 Generate VAPID keys:
 ```bash
 node -e "const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log('VAPID_PUBLIC='+k.publicKey+'\nVAPID_PRIVATE='+k.privateKey)"
+```
+
+---
+
+## Configuration reference
+
+Everything lives in `.env` (see `.env.example`). A channel/feature activates only
+when its required vars are set.
+
+### Core
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `3001` | Listen port (behind nginx). |
+| `HOST` | `127.0.0.1` | Bind address. |
+| `NODE_ENV` | — | Set `production` on the server. |
+| `STATUS_USER` | `admin` | Dashboard login user. |
+| `STATUS_PASS` | — | Dashboard login password **(required)**. |
+| `SESSION_SECRET` | — | Session signing secret, 64-hex **(required in prod)**. |
+
+### Operator dashboard
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `STATUS_SERVICES` | `webmail,nginx,ssh` | systemd units to report. |
+| `STATUS_CERTS` | — | `fullchain.pem` paths to check expiry on (comma-sep). |
+| `STATUS_HEALTH_URLS` | — | HTTP(s) endpoints to probe live (comma-sep). |
+| `STATUS_DISK_PATH` | `/` | Filesystem to report usage for. |
+
+### Public status page
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `STATUS_PUBLIC` | `true` | Set `false` to disable the public page entirely. |
+| `STATUS_PUBLIC_TITLE` | `MCNU Labs` | Title shown on the public page. |
+| `STATUS_COMPONENTS` | — | The watched components (grammar above). |
+| `STATUS_FAILS_TO_INCIDENT` | `2` | Consecutive fails before an auto-incident. |
+| `STATUS_PROBE_INTERVAL_MS` | `60000` | Probe cadence. |
+
+### Alerting
+| Variable | Channel | Purpose |
+|----------|---------|---------|
+| `ALERT_SMTP_HOST/PORT/SECURE` | Email | SMTP server (e.g. `smtp.purelymail.com` / `465` / `true`). |
+| `ALERT_SMTP_USER/PASS` | Email | SMTP auth. |
+| `ALERT_EMAIL_FROM/TO` | Email | Envelope addresses. |
+| `SMSO_API_KEY` | SMS | SMSO API key. |
+| `SMSO_TO` | SMS | Recipient in E.164 (`+40…`). |
+| `SMSO_SENDER` | SMS | *Optional* — auto-discovered from `/api/v1/senders` if unset. |
+| `VAPID_PUBLIC/PRIVATE` | Push | VAPID keypair (generate above). |
+| `VAPID_SUBJECT` | Push | `mailto:` contact. |
+
+---
+
+## Architecture & file map
+
+**Stack:** Node ≥ 20 · Fastify 5 · better-sqlite3 (WAL) · nodemailer · web-push.
+Zero frontend build — plain HTML/CSS/JS served static. One process does it all:
+HTTP server, the 60s prober, and alert dispatch.
+
+```
+status-dashboard/
+├── server/
+│   ├── index.js        Fastify app, routes, auth, public + admin APIs
+│   ├── config.js       env parsing — components grammar, groups, channels
+│   ├── collectors.js   read-only system probes (systemctl, df, mem, TLS, health)
+│   ├── probes.js       component probe registry: http · keyword · tls · tcp · dns
+│   ├── prober.js       60s loop → records checks, opens/closes auto-incidents
+│   ├── db.js           SQLite: checks + incidents, uptime/latency queries
+│   ├── notify.js       alert dispatch → email · SMS (SMSO) · web push
+│   ├── push.js         own VAPID subscription store
+│   └── store-util.js   atomic JSON write + corruption-safe load
+├── public/
+│   ├── index.html      public status page (/)
+│   ├── status.js       public page renderer (groups, bars, sparklines, incidents)
+│   ├── admin.html      operator dashboard (/admin)
+│   ├── app.js          dashboard renderer + incident authoring + push subscribe
+│   ├── login.html      sign-in
+│   ├── styles.css      shared MCNU-branded styles
+│   ├── nabla-bg.js     drifting ∇ canvas background
+│   ├── sw.js           service worker (web push)
+│   └── brand/          nabla mark + favicons
+├── deploy/
+│   ├── status.service  hardened systemd unit
+│   └── nginx.conf      reverse-proxy + TLS vhost
+├── docs/               README assets (banner, shields)
+└── .data/              SQLite DB + push subs (runtime; gitignored)
 ```
 
 ---
