@@ -53,8 +53,6 @@ function uptimeBar(history) {
 
 function componentRow(c) {
     const pill = STATE_PILL[c.current] || STATE_PILL.unknown;
-    const sparkId = `spark-${c.key}`;
-    const hasLatency = c.latency && c.latency.length > 1;
     return `
         <div class="comp">
             <div class="comp-head">
@@ -67,7 +65,6 @@ function componentRow(c) {
                 <span class="comp-pct">${c.uptime90 != null ? c.uptime90 + '% uptime' : 'collecting…'}</span>
                 <span>today</span>
             </div>
-            ${hasLatency ? `<canvas class="spark" id="${sparkId}" data-points="${esc(c.latency.join(','))}"></canvas>` : ''}
         </div>`;
 }
 
@@ -105,22 +102,26 @@ function render(data) {
             <span><i class="lg nodata"></i>No data</span>
         </div>`;
 
-    // Groups.
+    // Groups. Named groups are collapsible (header + aggregate uptime bar);
+    // start collapsed unless the group is not fully operational.
     const groups = data.groups || [{ name: null, status: data.overall, components: all }];
-    const groupsHtml = groups.map(g => {
+    const groupsHtml = groups.map((g, gi) => {
         const rows = g.components.map(componentRow).join('');
         if (!g.name) {
-            // Ungrouped: just a card of components.
             return `<section class="card pub-card">${rows}</section>`;
         }
         const gp = STATE_PILL[g.status] || STATE_PILL.unknown;
+        const open = g.status !== 'operational';   // auto-expand groups with issues
         return `
-            <section class="card pub-card group">
-                <div class="group-head">
-                    <h2 class="group-name">${esc(g.name)}</h2>
+            <section class="card pub-card group ${open ? 'open' : ''}" data-group="${gi}">
+                <button class="group-head" type="button" aria-expanded="${open}">
+                    <svg class="chev" viewBox="0 0 24 24" width="14" height="14"><polyline points="9 6 15 12 9 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    <span class="group-name">${esc(g.name)}</span>
+                    <span class="group-up">${g.uptime90 != null ? g.uptime90 + '%' : ''}</span>
                     <span class="pill ${gp.cls} px">${gp.text}</span>
-                </div>
-                ${rows}
+                </button>
+                <div class="group-agg">${uptimeBar(g.history)}</div>
+                <div class="group-body">${rows}</div>
             </section>`;
     }).join('');
 
@@ -153,10 +154,38 @@ function render(data) {
         <div class="all-good"><span class="nab">∇</span><div><b>No incidents reported</b><span>All clear over the last 90 days.</span></div></div>`;
     const incidentsCard = `<section class="card pub-card"><h2 class="sec-h"><span class="nab">∇</span> Incident History</h2>${incidentsBlock}</section>`;
 
-    page.innerHTML = hero + stats + legend + groupsHtml + incidentsCard;
+    // Live metrics (latency sparklines) — only for components flagged important.
+    const metrics = data.metrics || [];
+    const metricsHtml = metrics.length ? `
+        <h2 class="sec-h"><span class="nab">∇</span> Live Metrics</h2>
+        <div class="metrics">
+            ${metrics.map(m => {
+                const last = m.latency[m.latency.length - 1];
+                return `
+                    <div class="metric">
+                        <div class="metric-l">${esc(m.label)} <span class="metric-sub">latency</span></div>
+                        <div class="metric-v px">${last}<span class="metric-u">ms</span></div>
+                        <canvas class="spark" data-points="${esc(m.latency.join(','))}"></canvas>
+                    </div>`;
+            }).join('')}
+        </div>` : '';
+
+    page.innerHTML = hero + stats + legend + groupsHtml + metricsHtml + incidentsCard;
     document.getElementById('updated').textContent = 'updated ' + new Date(data.ts).toLocaleTimeString();
     drawSparklines();
     wireTooltips();
+    wireGroupToggles();
+}
+
+// Collapsible group headers.
+function wireGroupToggles() {
+    document.querySelectorAll('.group .group-head').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sec = btn.closest('.group');
+            const open = sec.classList.toggle('open');
+            btn.setAttribute('aria-expanded', String(open));
+        });
+    });
 }
 
 // Draw a latency sparkline into each canvas from its data-points.

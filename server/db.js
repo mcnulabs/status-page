@@ -103,6 +103,23 @@ export function recentLatency(component, limit = 48) {
     return rows.map(r => r.ms).reverse();
 }
 
+// Aggregated daily uptime across several components (for a group's bar).
+// A day counts as the AVERAGE of that day's per-component pct; null when no data.
+export function groupDailyUptime(components, days = 90) {
+    const per = components.map(c => dailyUptime(c, days));
+    if (!per.length) return [];
+    const out = [];
+    for (let i = 0; i < days; i++) {
+        const vals = per.map(p => p[i]?.pct).filter(v => v != null);
+        out.push({ day: per[0][i].day, pct: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null });
+    }
+    return out;
+}
+export function groupUptimePct(components, days = 90) {
+    const vals = components.map(c => uptimePct(c, days)).filter(v => v != null);
+    return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+}
+
 // --- incidents ---
 export function openAutoIncident(component, title) {
     // Only one ongoing auto-incident per component at a time.

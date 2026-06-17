@@ -12,6 +12,7 @@ import { startProber, stopProber } from './prober.js';
 import { initPush, isPushEnabled, publicKey, addSubscription, removeSubscription } from './push.js';
 import {
     dailyUptime, uptimePct, latestCheck, recentLatency, listIncidents, ongoingIncidents,
+    groupDailyUptime, groupUptimePct,
     createManualIncident, addIncidentUpdate, deleteIncident,
 } from './db.js';
 
@@ -139,11 +140,26 @@ app.get('/api/public/status', async (req, reply) => {
         if (!byGroup.has(g)) { byGroup.set(g, []); groupOrder.push(g); }
         byGroup.get(g).push(c);
     }
-    const groups = groupOrder.map(g => ({
-        name: g,                                  // null = ungrouped
-        status: aggregate(byGroup.get(g).map(c => c.current)),
-        components: byGroup.get(g),
-    }));
+    const groups = groupOrder.map(g => {
+        const comps = byGroup.get(g);
+        const keys = comps.map(c => c.key);
+        return {
+            name: g,                              // null = ungrouped
+            status: aggregate(comps.map(c => c.current)),
+            uptime90: groupUptimePct(keys, 90),
+            history: groupDailyUptime(keys, 90),  // [{day, pct}] aggregated
+            components: comps,
+        };
+    });
+
+    // Live metrics: only components flagged important, with their latency series.
+    const metrics = config.components
+        .filter(c => c.important)
+        .map(c => {
+            const flat = components.find(x => x.key === c.key);
+            return { key: c.key, label: c.label, latency: flat?.latency || [], current: flat?.current || 'unknown' };
+        })
+        .filter(m => m.latency.length >= 2);
 
     const incidents = listIncidents(20).map(i => ({
         id: i.id,
@@ -164,6 +180,7 @@ app.get('/api/public/status', async (req, reply) => {
         overall: aggregate(components.map(c => c.current)),
         groups,
         components,   // kept flat too, for any simple consumer
+        metrics,      // important components for the Live Metrics section
         incidents,
     };
 });

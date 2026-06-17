@@ -28,7 +28,11 @@ function parseComponents(raw) {
             group = key.slice(0, slash);
             key = key.slice(slash + 1);
         }
-        const base = { key, label: label || key, group };
+        // Trailing "!" marks a component as important → shown in the Live Metrics
+        // section with a latency sparkline. e.g. "mail/webmail!".
+        let important = false;
+        if (key.endsWith('!')) { important = true; key = key.slice(0, -1); }
+        const base = { key, label: label || key, group, important };
 
         // Legacy form: key|Label|https://...  → http
         const third = parts[2] || '';
