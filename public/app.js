@@ -159,7 +159,11 @@ async function openIncidents() {
 function closeIncidents() { incModal.hidden = true; }
 
 async function api(path, opts = {}) {
-    const res = await fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts });
+    // Only declare a JSON content-type when we actually send a body — otherwise
+    // Fastify rejects a body-less request with FST_ERR_CTP_EMPTY_JSON_BODY.
+    const headers = { ...(opts.headers || {}) };
+    if (opts.body != null) headers['Content-Type'] = 'application/json';
+    const res = await fetch(path, { credentials: 'same-origin', ...opts, headers });
     if (res.status === 401) { location.href = '/login.html'; throw new Error('unauth'); }
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
     return res.json();
