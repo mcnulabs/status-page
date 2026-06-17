@@ -1,0 +1,42 @@
+# /etc/systemd/system/status-dashboard.service
+#
+# Adjust User and WorkingDirectory to your VPS.
+# Then: sudo systemctl daemon-reload && sudo systemctl enable --now status-dashboard
+
+[Unit]
+Description=Server status dashboard (Node/Fastify)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=status
+Group=status
+WorkingDirectory=/opt/status-dashboard
+ExecStart=/usr/bin/node server/index.js
+Environment=NODE_ENV=production
+EnvironmentFile=-/opt/status-dashboard/.env
+
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# --- Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# The dashboard reads TLS certs (letsencrypt) and runs systemctl/df queries, and
+# writes the SQLite status DB under .data/. ProtectSystem=strict makes the whole
+# FS read-only EXCEPT the paths below.
+ReadWritePaths=/opt/status-dashboard/.data
+# It must also READ the cert dir; ProtectSystem=strict still allows reads, so
+# letsencrypt certs remain readable IF the 'status' user has read perms (see README).
+# NOTE: MemoryDenyWriteExecute is intentionally NOT set (breaks V8 JIT).
+
+[Install]
+WantedBy=multi-user.target

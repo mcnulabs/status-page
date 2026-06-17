@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCNU Labs — Server status (admin)</title>
+    <meta name="theme-color" content="#0A0E1A">
+    <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/brand/favicon-16.png" sizes="16x16" type="image/png">
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <div class="glow"></div>
+
+    <header class="topbar">
+        <a class="brand" href="/admin">
+            <img class="logo" src="/brand/nabla.svg" alt="MCNU" width="34">
+            <b>MCNU</b><small>ADMIN</small>
+        </a>
+        <div class="topbar-right">
+            <span class="updated" id="updated"></span>
+            <label class="auto"><input type="checkbox" id="autoToggle" checked> auto</label>
+            <a class="btn" href="/" target="_blank" rel="noopener">PUBLIC ↗</a>
+            <button class="btn" id="alertsBtn" hidden>🔔 ALERTS</button>
+            <button class="btn" id="incidentsBtn">INCIDENTS</button>
+            <button class="btn" id="refreshBtn">REFRESH</button>
+            <button class="btn" id="logoutBtn">SIGN OUT</button>
+        </div>
+    </header>
+
+    <div class="banner" id="banner" hidden>
+        <div class="banner-inner" id="bannerInner">
+            <span class="big-dot" id="bannerDot"></span>
+            <div>
+                <h2 id="bannerTitle">—</h2>
+                <p id="bannerSub"></p>
+            </div>
+        </div>
+    </div>
+
+    <main id="dashboard">
+        <div class="loading">LOADING…</div>
+    </main>
+
+    <footer>FOLLOW THE <span class="v">GRADIENT</span></footer>
+
+    <!-- Incident management modal (admin) -->
+    <div class="modal-backdrop" id="incidentsModal" hidden>
+        <div class="modal">
+            <div class="modal-head">
+                <h2 class="px">∇ INCIDENTS</h2>
+                <button class="btn" id="incidentsClose">CLOSE</button>
+            </div>
+            <div class="modal-body">
+                <form id="incForm" class="inc-form">
+                    <input type="text" id="incTitle" placeholder="Title (e.g. Scheduled maintenance)" required>
+                    <div class="inc-form-row">
+                        <select id="incComponent"><option value="">— general —</option></select>
+                        <select id="incImpact">
+                            <option value="minor">minor</option>
+                            <option value="major">major</option>
+                            <option value="critical">critical</option>
+                            <option value="none">none</option>
+                        </select>
+                        <select id="incStatus">
+                            <option value="investigating">investigating</option>
+                            <option value="identified">identified</option>
+                            <option value="monitoring">monitoring</option>
+                            <option value="maintenance">maintenance</option>
+                            <option value="resolved">resolved</option>
+                        </select>
+                    </div>
+                    <textarea id="incBody" rows="2" placeholder="Update message (what's happening)"></textarea>
+                    <button type="submit" class="btn-primary px">POST INCIDENT</button>
+                </form>
+                <div id="incList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/nabla-bg.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>

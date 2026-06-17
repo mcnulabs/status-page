@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCNU Labs — Sign in</title>
+    <meta name="theme-color" content="#0A0E1A">
+    <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="login-body">
+    <canvas id="bg"></canvas>
+    <div class="glow"></div>
+
+    <form class="login-card" id="loginForm">
+        <img class="logo biglogo" src="/brand/nabla.svg" alt="MCNU" width="72">
+        <div class="eyebrow px">SERVER STATUS</div>
+        <h1 class="px">MCNU LABS</h1>
+        <input type="text" id="user" placeholder="User" autocomplete="username" value="admin">
+        <input type="password" id="pass" placeholder="Password" autocomplete="current-password" required autofocus>
+        <button type="submit" class="px">SIGN IN</button>
+        <div class="login-error" id="err"></div>
+    </form>
+
+    <script src="/nabla-bg.js"></script>
+    <script>
+        const form = document.getElementById('loginForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const err = document.getElementById('err');
+            err.textContent = '';
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        user: document.getElementById('user').value,
+                        pass: document.getElementById('pass').value,
+                    }),
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    err.textContent = j.error || 'Sign in failed';
+                    return;
+                }
+                location.href = '/admin';
+            } catch (e) { err.textContent = 'Network error'; }
+        });
+    </script>
+</body>
+</html>
